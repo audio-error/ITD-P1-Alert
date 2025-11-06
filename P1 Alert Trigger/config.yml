@@ -1,0 +1,5 @@
+flask_port: 8080
+alert_message: "⚠ Priority 1 Ticket! ⚠"
+resolved_message: "P1 Ticket Resolved ✓"
+alert_sound: "P1.wav"
+resolved_sound: "bomb_defused.wav"

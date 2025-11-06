@@ -14,6 +14,44 @@ from waitress import serve
 from flask import Flask, request
 import pygame
 
+#load configuaration file
+#Curtesy of ChatGPT
+import yaml
+from pathlib import Path
+
+DEFAULTS = {
+    "flask_port": 5002,
+    "alert_message": "⚠ Priority 1 Ticket! ⚠",
+    "resolved_message": "P1 Ticket Resolved ✓",
+    "alert_sound": "P1.wav",
+    "resolved_sound": "bomb_defused.wav",
+}
+
+BASE = Path(__file__).resolve().parent
+def load_config(path: str | Path = "config.yml") -> dict:
+    p = Path(path)
+    if not p.is_absolute():
+        p = (BASE / p).resolve()
+    print("Loading", p)
+    if not p.exists():
+        print("could not find", p)
+        return DEFAULTS.copy()
+
+    with p.open("r") as f:
+        data = yaml.safe_load(f) or {}
+        cfg = DEFAULTS.copy()
+        cfg.update({k: v for k, v in data.items() if v is not None})
+    return cfg
+
+#global configurables
+cfg = load_config()
+FLASK_PORT = int(cfg["flask_port"])
+ALERT_MESSAGE = str(cfg["alert_message"])
+RESOLVED_MESSAGE = str(cfg["resolved_message"])
+ALERT_SOUND = str(cfg["alert_sound"])
+RESOLVED_SOUND = str(cfg["resolved_sound"])
+
+
 # ==============================================================================
 # INTEGRATED LED CONTROLLER CLASS
 # ==============================================================================
@@ -123,11 +161,10 @@ class LedController:
 # ====================================================================
 app = Flask(__name__)
 event_queue = queue.Queue()
-flask_port = 5002
 
 @app.route('/')
 def test():
-    return(f"SD alert script running on port {flask_port}")
+    return(f"SD alert script running on port {FLASK_PORT}")
 
 @app.route('/start_event')
 def trigger_event():
@@ -174,7 +211,7 @@ Ticket: #{ticket}
     try:
         pygame.init()
         pygame.mixer.init()
-        alert_sound = pygame.mixer.Sound('P1.wav')
+        alert_sound = pygame.mixer.Sound(ALERT_SOUND)
         pygame.mixer.Sound.play(alert_sound)
         pygame.mixer.quit()
     except Exception as e:
@@ -185,8 +222,8 @@ Ticket: #{ticket}
 
 
 def run_flask():
-    #app.run(host='0.0.0.0', port=5002)
-    serve(app, host='0.0.0.0', port=flask_port)
+    print("App running on port", FLASK_PORT)
+    serve(app, host='0.0.0.0', port=FLASK_PORT)
 
 
 class MainWindow(QMainWindow):
@@ -232,7 +269,7 @@ class MainWindow(QMainWindow):
     def start(self):
         self.blinking = True
         self.timer.start(1000)
-        self.label.setText("? Priority 1 Ticket! ?")
+        self.label.setText(ALERT_MESSAGE)
         self.central_widget.setStyleSheet("background-color: rgba(255, 0, 0, 0);")
         self.show()
         self.led_controller.start_p1_alert_pattern()
@@ -241,7 +278,7 @@ class MainWindow(QMainWindow):
         self.blinking = False
         self.timer.stop()
         self.central_widget.setStyleSheet("background-color: rgba(0, 255, 0, 255);")
-        self.label.setText("P1 Ticket Resolved")
+        self.label.setText(RESOLVED_MESSAGE)
 
         # ===> MODIFIED LED LOGIC FOR STOP EVENT <===
         # 1. Stop the blinking alert pattern thread.
@@ -251,7 +288,7 @@ class MainWindow(QMainWindow):
         try:
             pygame.mixer.quit()
             pygame.mixer.init()
-            resolved_sound = pygame.mixer.Sound('bomb_defused.wav')
+            resolved_sound = pygame.mixer.Sound(RESOLVED_SOUND)
             pygame.mixer.Sound.play(resolved_sound)
         except Exception as e:
             print(f"Sound error: {e}")
@@ -275,7 +312,10 @@ if __name__ == "__main__":
     if os.geteuid() != 0:
         print("Permission denied. Please run this script with 'sudo'.")
         exit()
-        
+
+    tst = load_config()
+    for x in tst.items():
+        print("DEBUG:", x)
     led_controller = LedController()
     led_controller.restore_leds_to_default() # Ensure a clean state on startup
 
