@@ -313,9 +313,6 @@ if __name__ == "__main__":
         print("Permission denied. Please run this script with 'sudo'.")
         exit()
 
-    tst = load_config()
-    for x in tst.items():
-        print("DEBUG:", x)
     led_controller = LedController()
     led_controller.restore_leds_to_default() # Ensure a clean state on startup
 
